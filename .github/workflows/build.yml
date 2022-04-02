@@ -35,8 +35,8 @@ jobs:
           - congee
         nixPath:
           - nixpkgs=channel:nixpkgs-unstable
-          - nixpkgs=channel:nixos-unstable
-          - nixpkgs=channel:nixos-21.11
+          # - nixpkgs=channel:nixos-unstable
+          # - nixpkgs=channel:nixos-21.11
     runs-on: ubuntu-latest
     steps:
     - name: Checkout repository
