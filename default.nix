@@ -14,7 +14,6 @@
   modules = import ./modules; # NixOS modules
   overlays = import ./overlays; # nixpkgs overlays
 
-  kim = pkgs.callPackage ./pkgs/kim { };
   pinentry-touchid = pkgs.callPackage ./pkgs/pinentry-touchid { };
   pam-touchid = pkgs.callPackage ./pkgs/pam-touchid { };
   sncli = pkgs.callPackage ./pkgs/sncli { };
