@@ -22,4 +22,5 @@
   ibmtss = pkgs.callPackage ./pkgs/ibmtss { };
   rusmux = pkgs.callPackage ./pkgs/rusmux { };
   wikit = pkgs.callPackage ./pkgs/wikit { };
+  some-sass-language-server = pkgs.callPackage ./pkgs/some-sass-language-server { };
 }
