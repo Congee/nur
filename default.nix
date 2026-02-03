@@ -14,6 +14,7 @@
   modules = import ./modules; # NixOS modules
   overlays = import ./overlays; # nixpkgs overlays
 
+  pruner = pkgs.callPackage ./pkgs/pruner { };
   ory.hydra = pkgs.callPackage ./pkgs/ory/hydra { };
   some-sass-language-server = pkgs.callPackage ./pkgs/some-sass-language-server { };
 }
