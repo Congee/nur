@@ -9,13 +9,13 @@
 
 let
   pname = "sentry";
-  version = "0.28.1";
+  version = "0.29.1";
 
   src = fetchFromGitHub {
     owner = "getsentry";
     repo = "cli";
     rev = version;
-    hash = "sha256-J4ozDjMrtGc1nHA3AxYu913Ntb6rgGN4Qbkpl+IkCfI=";
+    hash = "sha256-8hMSOw2FXBLw5zPySZbWJLGRBP/uOtctJA/jxPCPYyQ=";
   };
 
   # @sentry/api version pinned in bun.lock; determines the OpenAPI spec tag
