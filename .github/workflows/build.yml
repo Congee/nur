@@ -1,8 +1,9 @@
 name: "Build and populate cache"
 on:
-  # Branch pushes cover new branches, same-repo PR branches, and auto-update
-  # branches pushed via NUR_DEPLOY_KEY. Avoid also running pull_request here
-  # because that creates duplicate required checks.
+  pull_request:
+  # Branch pushes cover new branches before they have an open PR. Once a
+  # commit is associated with an open PR, the push-side build is skipped and
+  # the pull_request build is canonical.
   push:
     branches:
       - '**'
@@ -12,12 +13,43 @@ on:
     # https://www.random.org/clock-times/?num=1&earliest=01%3A00&latest=08%3A00&interval=5&format=html&rnd=new
     - cron:  '51 2 * * *'
 
+permissions:
+  contents: read
+  pull-requests: read
+
 concurrency:
-  group: build-${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  group: build-${{ github.workflow }}-${{ github.event_name }}-${{ github.head_ref || github.ref_name }}
   cancel-in-progress: true
 
 jobs:
+  should-run:
+    runs-on: ubuntu-latest
+    outputs:
+      tests: ${{ steps.decision.outputs.tests }}
+    steps:
+    - id: decision
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: |
+        tests=true
+
+        if [[ "${{ github.event_name }}" == "push" ]]; then
+          open_prs="$(gh api \
+            -H "Accept: application/vnd.github+json" \
+            "repos/${{ github.repository }}/commits/${{ github.sha }}/pulls" \
+            --jq '[.[] | select(.state == "open")] | length')"
+
+          if [[ "$open_prs" != "0" ]]; then
+            echo "Skipping push build because this commit already has $open_prs open PR(s)."
+            tests=false
+          fi
+        fi
+
+        echo "tests=$tests" >> "$GITHUB_OUTPUT"
+
   tests:
+    needs: should-run
+    if: ${{ needs.should-run.outputs.tests == 'true' }}
     strategy:
       matrix:
         # Set this to notify the global nur package registry that changes are
@@ -59,7 +91,7 @@ jobs:
     - name: Setup cachix
       uses: cachix/cachix-action@v17
       # Don't replace <YOUR_CACHIX_NAME> here!
-      if: ${{ matrix.cachixName != '<YOUR_CACHIX_NAME>' }}
+      if: ${{ matrix.cachixName != '<YOUR_CACHIX_NAME>' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) }}
       with:
         name: ${{ matrix.cachixName }}
         signingKey: '${{ secrets.CACHIX_SIGNING_KEY }}'
@@ -79,5 +111,5 @@ jobs:
       run: nix shell -f '<nixpkgs>' nix-build-uncached -c nix-build-uncached ci.nix -A cacheOutputs
     - name: Trigger NUR update
       # Don't replace <YOUR_REPO_NAME> here!
-      if: ${{ matrix.nurRepo != '<YOUR_REPO_NAME>' }}
+      if: ${{ matrix.nurRepo != '<YOUR_REPO_NAME>' && github.event_name != 'pull_request' }}
       run: curl -XPOST "https://nur-update.nix-community.org/update?repo=${{ matrix.nurRepo }}"
