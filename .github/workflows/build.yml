@@ -1,8 +1,8 @@
 name: "Build and populate cache"
 on:
+  pull_request:
   # Branch pushes cover new branches, same-repo PR branches, and auto-update
-  # branches pushed via NUR_DEPLOY_KEY. Avoid also running pull_request here
-  # because that creates duplicate required checks.
+  # branches pushed via NUR_DEPLOY_KEY.
   push:
     branches:
       - '**'
@@ -18,6 +18,9 @@ concurrency:
 
 jobs:
   tests:
+    # Same-repo branches are already validated by push checks. Fork PRs do not
+    # push to this repository, so validate them through pull_request.
+    if: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository }}
     strategy:
       matrix:
         # Set this to notify the global nur package registry that changes are
