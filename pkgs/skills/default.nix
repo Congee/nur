@@ -20,7 +20,7 @@ stdenv.mkDerivation (finalAttrs: {
   src = fetchFromGitHub {
     owner = "vercel-labs";
     repo = "skills";
-    rev = "bc21a37a12b90fcb5aec051c91baf5b227b704b1";
+    rev = "v${finalAttrs.version}";
     hash = "sha256-JVJeottMyjxdiGPS7O4QsshKdbwbYcKMvwe/PB7I/Zw=";
   };
 
