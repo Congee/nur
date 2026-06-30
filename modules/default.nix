@@ -1,5 +1,4 @@
 {
-  # Add your NixOS modules here
-  #
-  # my-module = ./my-module;
+  # Home Manager service for llama.cpp's llama-server.
+  llama-cpp = ./llama-cpp.nix;
 }
