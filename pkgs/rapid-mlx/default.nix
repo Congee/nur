@@ -49,6 +49,7 @@ python3Packages.buildPythonApplication rec {
     fastapi
     huggingface-hub
     jsonschema
+    llguidance
     mcp
     mlx
     mlx-lm
