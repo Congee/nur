@@ -61,6 +61,7 @@ python3Packages.buildPythonApplication rec {
     requests
     tabulate
     tokenizers
+    tomli-w
     tqdm
     transformers
     uvicorn
