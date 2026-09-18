@@ -58,6 +58,7 @@ python3Packages.buildPythonApplication rec {
     pillow
     psutil
     pyyaml
+    referencing
     requests
     tabulate
     tokenizers
@@ -68,10 +69,10 @@ python3Packages.buildPythonApplication rec {
     websockets
   ];
 
-  # Upstream caps transformers<5.13 because 5.13.0's _LazyAutoMapping.register
-  # dereferenced key.__module__, and mlx-lm registers its NewlineTokenizer by
-  # string name. 5.14.0 restored getattr(key, "__module__", ""), so nixpkgs'
-  # 5.15.0 imports fine.
+  # Upstream excludes the broken 5.13.0 (its _LazyAutoMapping.register
+  # dereferenced key.__module__, which mlx-lm's string-name tokenizer
+  # registration tripped over) and caps <5.16 only as a precaution against
+  # unvalidated minors; nixpkgs' 5.16+ imports fine.
   pythonRelaxDeps = [ "transformers" ];
 
   # tests require downloaded models and a live server
