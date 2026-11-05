@@ -111,6 +111,7 @@ python3Packages.buildPythonApplication rec {
   # registration tripped over) and caps <5.16 only as a precaution against
   # unvalidated minors; nixpkgs' 5.16+ imports fine.
   pythonRelaxDeps = [
+    "mcp"
     "pydantic-ai-slim"
     "tokenizers"
     "transformers"
