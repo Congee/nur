@@ -66,13 +66,17 @@ EOF
         '        Settings { EmptyView() }' \
         '        Settings { SettingsView().environmentObject(AppDelegate.refreshSignal) }'
 
+    # Swift 6.4's build system drops the modulemap's `link "sqlite3"`; link it explicitly.
     substituteInPlace Package.swift \
       --replace-fail \
         'name: "WhatCableCore",
-            path: "Sources/WhatCableCore",' \
+            path: "Sources/WhatCableCore",
+            resources: [.process("Resources")]' \
         'name: "WhatCableCore",
             dependencies: ["CSQLite"],
-            path: "Sources/WhatCableCore",'
+            path: "Sources/WhatCableCore",
+            resources: [.process("Resources")],
+            linkerSettings: [.linkedLibrary("sqlite3")]'
 
     substituteInPlace Package.swift \
       --replace-fail \
