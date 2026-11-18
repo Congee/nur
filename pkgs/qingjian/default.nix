@@ -7,10 +7,12 @@
   imagemagick,
   libicns,
   oniguruma,
-  # Linux
-  cmake,
   pkg-config,
   python3,
+  # Darwin
+  sqlite,
+  # Linux
+  cmake,
   openssl,
   fcitx5,
   nlohmann_json,
@@ -50,20 +52,25 @@ rustPlatform.buildRustPackage (finalAttrs: {
 
   cargoHash = "sha256-czZijlOPaP9Kahq90dRkuRnkcwvXQbIaNpxPFMq2i/8=";
 
-  nativeBuildInputs =
-    lib.optionals isDarwin [
-      imagemagick
-      libicns
-    ]
-    ++ lib.optionals isLinux [
-      cmake
-      pkg-config
-      python3
-    ];
+  nativeBuildInputs = [
+    pkg-config
+    python3
+  ]
+  ++ lib.optionals isDarwin [
+    imagemagick
+    libicns
+  ]
+  ++ lib.optionals isLinux [
+    cmake
+  ];
 
   # nixpkgs sets RUSTONIG_SYSTEM_LIBONIG, so onig_sys links the system library
   buildInputs = [
     oniguruma
+  ]
+  # The clipboard app's rusqlite; nixpkgs sets LIBSQLITE3_SYS_USE_PKG_CONFIG
+  ++ lib.optionals isDarwin [
+    sqlite
   ]
   ++ lib.optionals isLinux [
     openssl
@@ -76,27 +83,37 @@ rustPlatform.buildRustPackage (finalAttrs: {
 
   cargoBuildFlags = [
     "-p"
-    (if isDarwin then "qingjian-macos" else "qingjian-linux-server")
-    "-p"
     "qingjian-settings"
-  ];
+  ]
+  ++ (
+    if isDarwin then
+      [
+        "-p"
+        "qingjian-macos"
+        "-p"
+        "qingjian-clipboard-app"
+      ]
+    else
+      [
+        "-p"
+        "qingjian-linux-server"
+      ]
+  );
 
   env.QINGJIAN_BUILD = "nix · ${finalAttrs.version}";
 
-  # The settings app loads fonts from a fixed list of FHS paths (no fontconfig),
-  # and finds its resources beside the exe or under /usr/share/qingjian.
+  # bamboo-slip loads fonts from a fixed list of FHS paths (no fontconfig);
+  # append store fonts so the FHS ones still win where they exist.
   postPatch = lib.optionalString isLinux ''
     substituteInPlace crates/bamboo-slip/src/fonts/linux.rs \
-      --replace-fail '"/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",' \
-        '"${dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf", "/usr/share/fonts/truetype/noto/NotoSans-Regular.ttf",' \
-      --replace-fail '"/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",' \
-        '"${dejavu_fonts}/share/fonts/truetype/DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/noto/NotoSans-Bold.ttf",' \
-      --replace-fail '"/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",' \
-        '"${noto-fonts-cjk-sans}/share/fonts/opentype/noto-cjk/NotoSansCJK-VF.otf.ttc", "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",' \
-      --replace-fail '"/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",' \
-        '"${noto-fonts-color-emoji}/share/fonts/noto/NotoColorEmoji.ttf", "/usr/share/fonts/truetype/noto/NotoColorEmoji.ttf",'
-    substituteInPlace crates/qingjian-platform/src/resources.rs \
-      --replace-fail 'const SYSTEM_ROOTS: [&str; 3] = [' "const SYSTEM_ROOTS: [&str; 4] = [ \"$out/share/qingjian/resources\","
+      --replace-fail '"/usr/local/share/fonts/dejavu/DejaVuSans.ttf",' \
+        '"/usr/local/share/fonts/dejavu/DejaVuSans.ttf", "${dejavu_fonts}/share/fonts/truetype/DejaVuSans.ttf",' \
+      --replace-fail '"/usr/local/share/fonts/noto/NotoSans-Bold.ttf",' \
+        '"/usr/local/share/fonts/noto/NotoSans-Bold.ttf", "${dejavu_fonts}/share/fonts/truetype/DejaVuSans-Bold.ttf",' \
+      --replace-fail '"/usr/local/share/fonts/noto/NotoSansCJKsc-Regular.otf",' \
+        '"/usr/local/share/fonts/noto/NotoSansCJKsc-Regular.otf", "${noto-fonts-cjk-sans}/share/fonts/opentype/noto-cjk/NotoSansCJK-VF.otf.ttc",' \
+      --replace-fail '"/usr/local/share/fonts/noto/NotoColorEmoji.ttf",' \
+        '"/usr/local/share/fonts/noto/NotoColorEmoji.ttf", "${noto-fonts-color-emoji}/share/fonts/noto/NotoColorEmoji.ttf",'
   '';
 
   # Not postUnpack: the cargo vendor derivation inherits it but not `data`.
@@ -127,20 +144,29 @@ rustPlatform.buildRustPackage (finalAttrs: {
       ''
         runHook preInstall
 
-        # Mirrors apps/macos/scripts/bundle.sh, minus PlistBuddy/sips/iconutil.
+        # Mirrors apps/macos/scripts/bundle.sh, minus PlistBuddy/sips/iconutil/codesign.
         bin=target/${stdenv.hostPlatform.rust.cargoShortTarget}/release
         app="$out/Library/Input Methods/Qingjian.app"
         res="$app/Contents/Resources"
         settings="$app/Contents/Applications/QingjianSettings.app"
-        mkdir -p "$app/Contents/MacOS" "$res" "$settings/Contents/MacOS" "$settings/Contents/Resources" $out/bin
+        clipboard="$app/Contents/Applications/QingjianClipboard.app"
+        mkdir -p "$app/Contents/MacOS" "$res" "$settings/Contents/MacOS" "$settings/Contents/Resources" \
+          "$clipboard/Contents/MacOS" "$clipboard/Contents/Resources"
 
+        # Short version from each app's crate; the build number must grow across releases.
+        writePlist() {
+          local version
+          version=$(sed -n 's/^version = "\(.*\)"/\1/p' "$2" | head -1)
+          sed -e "/CFBundleShortVersionString/{n;s|>.*<|>$version<|;}" \
+            -e '/CFBundleVersion</{n;s|>.*<|>${finalAttrs.version}<|;}' "$1" > "$3"
+        }
         install -m755 $bin/qingjian-macos "$app/Contents/MacOS/"
         install -m755 $bin/qingjian-settings "$settings/Contents/MacOS/"
-        sed -e '/CFBundleShortVersionString/{n;s|>.*<|>${finalAttrs.version}<|;}' \
-          apps/macos/Info.plist > "$app/Contents/Info.plist"
-        sed -e '/CFBundleShortVersionString/{n;s|>.*<|>${finalAttrs.version}<|;}' \
-          apps/settings/macos/Info.plist > "$settings/Contents/Info.plist"
-        printf 'APPL????' > "$app/Contents/PkgInfo"
+        install -m755 $bin/qingjian-clipboard "$clipboard/Contents/MacOS/"
+        writePlist apps/macos/Info.plist apps/macos/Cargo.toml "$app/Contents/Info.plist"
+        writePlist apps/settings/macos/Info.plist apps/settings/Cargo.toml "$settings/Contents/Info.plist"
+        writePlist apps/clipboard/macos/Info.plist apps/clipboard/Cargo.toml "$clipboard/Contents/Info.plist"
+        for a in "$app" "$settings" "$clipboard"; do printf 'APPL????' > "$a/Contents/PkgInfo"; done
 
         cp -R apps/macos/resources/*.lproj "$res/"
         cp assets/sample/*.tsv assets/emoji/*.tsv assets/levels/levels-*.tsv "$res/"
@@ -155,6 +181,8 @@ rustPlatform.buildRustPackage (finalAttrs: {
         for f in assets/lexicon/english.tsv data/generated/english.tsv; do
           if [ -f $f ]; then cp $f "$res/"; fi
         done
+        python3 tools/corpus/vietnamese_words.py assets/glossary/glossary-vi.tsv \
+          "$res/vietnamese.tsv" "$res/vietnamese-zh.tsv"
         cp assets/icon/menu.pdf "$res/qingjian-menu.pdf"
 
         for size in 16 32 128 256 512; do
@@ -162,9 +190,10 @@ rustPlatform.buildRustPackage (finalAttrs: {
         done
         png2icns "$res/Qingjian.icns" icon_{16,32,128,256,512}.png
         cp "$res/Qingjian.icns" "$settings/Contents/Resources/"
+        cp "$res/Qingjian.icns" "$clipboard/Contents/Resources/"
 
-        # `qingjian-macos --register` enables the input source after linking the bundle.
-        ln -s "$app/Contents/MacOS/qingjian-macos" $out/bin/qingjian-macos
+        # No bin/ symlink: --register registers NSBundle.mainBundle, which a symlink resolves to bin/.
+        # Install the bundle into ~/Library/Input Methods and run --register from there.
 
         runHook postInstall
       ''
@@ -181,9 +210,9 @@ rustPlatform.buildRustPackage (finalAttrs: {
         # The server looks for <exe>/../share/qingjian/resources
         python3 apps/linux/scripts/files.py resources $out/share/qingjian/resources --root "$PWD"
 
-        mkdir -p $out/share/systemd/user $out/share/applications
+        mkdir -p $out/lib/systemd/user $out/share/applications
         sed "s|@EXEC@|$out/bin/qingjian-linux-server|" apps/linux/scripts/qingjian-server.service.in \
-          > $out/share/systemd/user/qingjian-server.service
+          > $out/lib/systemd/user/qingjian-server.service
         sed "s|^Exec=qingjian-settings$|Exec=$out/bin/qingjian-settings|" apps/settings/linux/qingjian-settings.desktop \
           > $out/share/applications/qingjian-settings.desktop
         for size in 16 22 24 32 48 64 128 256; do
@@ -218,13 +247,22 @@ rustPlatform.buildRustPackage (finalAttrs: {
     '';
     homepage = "https://qingjian.app";
     changelog = "https://github.com/qingjian-team/qingjian/releases/tag/v${finalAttrs.version}";
-    license = lib.licenses.gpl3Plus;
+    # Code is GPL-3.0+; the rest covers the bundled dictionaries, glossaries and code tables.
+    license = with lib.licenses; [
+      gpl3Plus
+      mit
+      unicode-30
+      cc-by-sa-40
+      cc-by-40
+      ofl
+      asl20
+    ];
     maintainers = with lib.maintainers; [ congee ];
-    mainProgram = if isDarwin then "qingjian-macos" else "qingjian-linux-server";
     platforms = [
       "aarch64-darwin"
       "x86_64-linux"
       "aarch64-linux"
     ];
-  };
+  }
+  // lib.optionalAttrs isLinux { mainProgram = "qingjian-linux-server"; };
 })
