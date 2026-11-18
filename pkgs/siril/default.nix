@@ -75,12 +75,6 @@ stdenv.mkDerivation (finalAttrs: {
     hash = "sha256-tPk1Dm545J2aAlAFwGtxLcAq0MsxJGCRBY2VaEh/1js=";
   };
 
-  # libxisf 0.2.14 added open(std::filesystem::path), making const char* ambiguous.
-  postPatch = ''
-    substituteInPlace src/io/SirilXISFReader.cpp \
-      --replace-fail 'xisfReader.open(filename);' 'xisfReader.open(LibXISF::String(filename));'
-  '';
-
   nativeBuildInputs = [
     meson
     ninja
