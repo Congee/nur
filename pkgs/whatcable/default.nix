@@ -3,6 +3,7 @@
   swiftPackages,
   fetchFromGitHub,
   sqlite,
+  apple-sdk_26,
 }:
 
 swiftPackages.stdenv.mkDerivation rec {
@@ -91,9 +92,15 @@ EOF
             name: "WhatCableCoreTests",'
   '';
 
+  # swift 6.4 propagates apple-sdk_27, whose SwiftUI declares @State as a macro
+  # implemented by Xcode's closed SwiftUIMacros plugin, which nixpkgs' toolchain
+  # lacks. The highest SDK in the inputs wins, so override the hook's choice.
   configurePhase = ''
     runHook preConfigure
     export HOME="$TMPDIR"
+    export DEVELOPER_DIR=${apple-sdk_26}
+    export SDKROOT=${apple-sdk_26.sdkroot}
+    export NIX_APPLE_SDK_VERSION=260000
     runHook postConfigure
   '';
 
