@@ -66,7 +66,8 @@ EOF
         '        Settings { EmptyView() }' \
         '        Settings { SettingsView().environmentObject(AppDelegate.refreshSignal) }'
 
-    # Swift 6.4's build system drops the modulemap's `link "sqlite3"`; link it explicitly.
+    # Swift 6.4's build system drops the modulemap's `link "sqlite3"` and the
+    # cc-wrapper's -L paths; link it explicitly.
     substituteInPlace Package.swift \
       --replace-fail \
         'name: "WhatCableCore",
@@ -76,7 +77,7 @@ EOF
             dependencies: ["CSQLite"],
             path: "Sources/WhatCableCore",
             resources: [.process("Resources")],
-            linkerSettings: [.linkedLibrary("sqlite3")]'
+            linkerSettings: [.linkedLibrary("sqlite3"), .unsafeFlags(["-L${lib.getLib sqlite}/lib"])]'
 
     substituteInPlace Package.swift \
       --replace-fail \
